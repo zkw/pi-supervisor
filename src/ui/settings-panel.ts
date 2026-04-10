@@ -40,11 +40,12 @@ export async function openSettings(
   defaultModelId: string,
   defaultSensitivity: Sensitivity,
 ): Promise<SettingsResult | null> {
+  const activeState = state?.active ? state : null;
   const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
-  const currentProvider = state?.provider ?? workspaceConfig?.provider ?? defaultProvider;
-  const currentModelId = state?.modelId ?? workspaceConfig?.modelId ?? defaultModelId;
-  const currentSensitivity = state?.sensitivity ?? workspaceConfig?.sensitivity ?? defaultSensitivity;
-  const isActive = state?.active === true;
+  const currentProvider = activeState?.provider ?? workspaceConfig?.provider ?? defaultProvider;
+  const currentModelId = activeState?.modelId ?? workspaceConfig?.modelId ?? defaultModelId;
+  const currentSensitivity = activeState?.sensitivity ?? workspaceConfig?.sensitivity ?? defaultSensitivity;
+  const isActive = activeState !== null;
 
   const result: SettingsResult = {};
 
@@ -99,8 +100,8 @@ export async function openSettings(
       items.push({
         id: "outcome",
         label: "Outcome",
-        description: `Steers: ${state!.interventions.length} · Turns: ${state!.turnCount}`,
-        currentValue: `"${state!.outcome.length > 60 ? state!.outcome.slice(0, 59) + "…" : state!.outcome}"`,
+        description: `Steers: ${activeState!.interventions.length} · Turns: ${activeState!.turnCount}`,
+        currentValue: `"${activeState!.outcome.length > 60 ? activeState!.outcome.slice(0, 59) + "…" : activeState!.outcome}"`,
       });
       items.push({
         id: "stop",
