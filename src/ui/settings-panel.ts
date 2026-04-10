@@ -12,6 +12,7 @@ import { ModelSelectorComponent, SettingsManager } from "@mariozechner/pi-coding
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { SupervisorState, Sensitivity } from "../types.js";
 import { isWidgetVisible } from "./status-widget.js";
+import { loadWorkspaceConfig } from "../workspace-config.js";
 
 const SENSITIVITIES: Sensitivity[] = ["low", "medium", "high"];
 
@@ -39,9 +40,10 @@ export async function openSettings(
   defaultModelId: string,
   defaultSensitivity: Sensitivity,
 ): Promise<SettingsResult | null> {
-  const currentProvider = state?.provider ?? defaultProvider;
-  const currentModelId = state?.modelId ?? defaultModelId;
-  const currentSensitivity = state?.sensitivity ?? defaultSensitivity;
+  const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+  const currentProvider = state?.provider ?? workspaceConfig?.provider ?? defaultProvider;
+  const currentModelId = state?.modelId ?? workspaceConfig?.modelId ?? defaultModelId;
+  const currentSensitivity = state?.sensitivity ?? workspaceConfig?.sensitivity ?? defaultSensitivity;
   const isActive = state?.active === true;
 
   const result: SettingsResult = {};
@@ -126,7 +128,8 @@ export async function openSettings(
           const sens = newValue as Sensitivity;
           result.sensitivity = sens;
           // Update description dynamically
-          settingsList.updateValue("sensitivity", sens);
+          const sensItem = items.find((i) => i.id === "sensitivity");
+          if (sensItem) sensItem.description = SENSITIVITY_DESCRIPTIONS[sens];
         } else if (id === "widget") {
           result.widget = newValue === "visible";
         } else if (id === "stop" && newValue === "confirm") {
