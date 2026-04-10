@@ -54,7 +54,7 @@ export default function (pi: ExtensionAPI) {
   ): boolean => {
     const saved = saveSupervisorConfig(provider, modelId, sensitivity);
     if (!saved) {
-      ctx.ui.notify("Failed to save supervisor settings to ~/.pi/agent/supervisor.json.", "warning");
+      ctx.ui.notify("Failed to save supervisor settings to ~/.pi/agent/supervisor.json", "warning");
     }
     return saved;
   };
