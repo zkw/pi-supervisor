@@ -282,7 +282,14 @@ export default function (pi: ExtensionAPI) {
 
       if (!trimmed || trimmed === "settings") {
         const s = state.getState();
-        const result = await openSettings(ctx, s, DEFAULT_PROVIDER, DEFAULT_MODEL_ID, DEFAULT_SENSITIVITY);
+        // Use workspace config as defaults so prior selections are shown when supervisor is inactive
+        const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+        const result = await openSettings(
+          ctx, s,
+          workspaceConfig?.provider ?? DEFAULT_PROVIDER,
+          workspaceConfig?.modelId  ?? DEFAULT_MODEL_ID,
+          workspaceConfig?.sensitivity ?? DEFAULT_SENSITIVITY,
+        );
         if (!result) return; // user cancelled with no changes
 
         // Apply model change
@@ -308,9 +315,9 @@ export default function (pi: ExtensionAPI) {
         // Persist model and/or sensitivity together
         if (result.model || result.sensitivity) {
           const cur = state.getState();
-          const p = result.model?.provider ?? cur?.provider ?? DEFAULT_PROVIDER;
-          const m = result.model?.modelId  ?? cur?.modelId  ?? DEFAULT_MODEL_ID;
-          const sens = result.sensitivity  ?? cur?.sensitivity;
+          const p = result.model?.provider ?? cur?.provider ?? workspaceConfig?.provider ?? DEFAULT_PROVIDER;
+          const m = result.model?.modelId  ?? cur?.modelId  ?? workspaceConfig?.modelId  ?? DEFAULT_MODEL_ID;
+          const sens = result.sensitivity  ?? cur?.sensitivity ?? workspaceConfig?.sensitivity;
           const saved = saveWorkspaceConfig(ctx.cwd, p, m, sens);
           if (saved && result.model) {
             ctx.ui.notify(" · saved to .pi/", "info");
