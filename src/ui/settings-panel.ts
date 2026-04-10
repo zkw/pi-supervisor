@@ -12,7 +12,7 @@ import { ModelSelectorComponent, SettingsManager } from "@mariozechner/pi-coding
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { SupervisorState, Sensitivity } from "../types.js";
 import { isWidgetVisible } from "./status-widget.js";
-import { loadWorkspaceConfig } from "../workspace-config.js";
+import { loadSupervisorConfig } from "../supervisor-config.js";
 
 const SENSITIVITIES: Sensitivity[] = ["low", "medium", "high"];
 
@@ -41,10 +41,10 @@ export async function openSettings(
   defaultSensitivity: Sensitivity,
 ): Promise<SettingsResult | null> {
   const activeState = state?.active ? state : null;
-  const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
-  const currentProvider = activeState?.provider ?? workspaceConfig?.provider ?? defaultProvider;
-  const currentModelId = activeState?.modelId ?? workspaceConfig?.modelId ?? defaultModelId;
-  const currentSensitivity = activeState?.sensitivity ?? workspaceConfig?.sensitivity ?? defaultSensitivity;
+  const supervisorConfig = loadSupervisorConfig();
+  const currentProvider = activeState?.provider ?? supervisorConfig?.provider ?? defaultProvider;
+  const currentModelId = activeState?.modelId ?? supervisorConfig?.modelId ?? defaultModelId;
+  const currentSensitivity = activeState?.sensitivity ?? supervisorConfig?.sensitivity ?? defaultSensitivity;
   const isActive = activeState !== null;
 
   const result: SettingsResult = {};
