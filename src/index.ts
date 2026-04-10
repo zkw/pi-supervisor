@@ -16,7 +16,7 @@ import { analyze, loadSystemPrompt } from "./engine.js";
 import { updateUI, toggleWidget, isWidgetVisible, type WidgetAction } from "./ui/status-widget.js";
 import { pickModel } from "./ui/model-picker.js";
 import { openSettings } from "./ui/settings-panel.js";
-import { loadWorkspaceConfig, saveWorkspaceConfig } from "./workspace-config.js";
+import { loadSupervisorConfig, saveSupervisorConfig } from "./supervisor-config.js";
 import type { Sensitivity } from "./types.js";
 import { Type } from "@sinclair/typebox";
 
@@ -46,6 +46,18 @@ export default function (pi: ExtensionAPI) {
   let currentCtx: ExtensionContext | undefined;
   let idleSteers = 0; // consecutive agent_end steers; reset on done/stop/new supervision
   const getActiveState = () => state.isActive() ? state.getState() : null;
+  const persistSupervisorConfig = (
+    ctx: ExtensionContext,
+    provider: string,
+    modelId: string,
+    sensitivity?: Sensitivity,
+  ): boolean => {
+    const saved = saveSupervisorConfig(provider, modelId, sensitivity);
+    if (!saved) {
+      ctx.ui.notify("Failed to save supervisor settings to ~/.pi/agent/supervisor.json", "warning");
+    }
+    return saved;
+  };
 
   // ---- Session lifecycle: restore state ----
 
@@ -190,8 +202,8 @@ export default function (pi: ExtensionAPI) {
         if (result?.sensitivity && state.isActive()) state.setSensitivity(result.sensitivity);
         if (result?.model || result?.sensitivity) {
           const cur = getActiveState();
-          saveWorkspaceConfig(
-            ctx.cwd,
+          persistSupervisorConfig(
+            ctx,
             result.model?.provider ?? cur?.provider ?? DEFAULT_PROVIDER,
             result.model?.modelId  ?? cur?.modelId  ?? DEFAULT_MODEL_ID,
             result.sensitivity     ?? cur?.sensitivity,
@@ -209,11 +221,11 @@ export default function (pi: ExtensionAPI) {
         if (!spec) {
           // No args → open the interactive pi-style model picker
           const s = getActiveState();
-          const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+          const supervisorConfig = loadSupervisorConfig();
           const picked = await pickModel(
             ctx,
-            s?.provider ?? workspaceConfig?.provider ?? DEFAULT_PROVIDER,
-            s?.modelId ?? workspaceConfig?.modelId ?? DEFAULT_MODEL_ID,
+            s?.provider ?? supervisorConfig?.provider ?? DEFAULT_PROVIDER,
+            s?.modelId ?? supervisorConfig?.modelId ?? DEFAULT_MODEL_ID,
           );
           if (!picked) return; // user cancelled
 
@@ -224,11 +236,11 @@ export default function (pi: ExtensionAPI) {
             state.setModel(provider, modelId);
             updateUI(ctx, state.getState());
           }
-          const currentSensitivity = getActiveState()?.sensitivity ?? workspaceConfig?.sensitivity;
-          const saved = saveWorkspaceConfig(ctx.cwd, provider, modelId, currentSensitivity);
+          const currentSensitivity = getActiveState()?.sensitivity ?? supervisorConfig?.sensitivity;
+          const saved = persistSupervisorConfig(ctx, provider, modelId, currentSensitivity);
           ctx.ui.notify(
             `Supervisor model set to ${provider}/${modelId}${state.isActive() ? "" : " (takes effect on next /supervise)"}` +
-              (saved ? " · saved to .pi/" : ""),
+              (saved ? " · saved to ~/.pi/agent/supervisor.json" : ""),
             "info"
           );
           return;
@@ -239,7 +251,7 @@ export default function (pi: ExtensionAPI) {
         let provider: string;
         let modelId: string;
         if (slashIdx === -1) {
-          provider = getActiveState()?.provider ?? loadWorkspaceConfig(ctx.cwd)?.provider ?? DEFAULT_PROVIDER;
+          provider = getActiveState()?.provider ?? loadSupervisorConfig()?.provider ?? DEFAULT_PROVIDER;
           modelId = spec;
         } else {
           provider = spec.slice(0, slashIdx);
@@ -250,11 +262,11 @@ export default function (pi: ExtensionAPI) {
           state.setModel(provider, modelId);
           updateUI(ctx, state.getState());
         }
-        const currentSensitivity = getActiveState()?.sensitivity ?? loadWorkspaceConfig(ctx.cwd)?.sensitivity;
-        const saved = saveWorkspaceConfig(ctx.cwd, provider, modelId, currentSensitivity);
+        const currentSensitivity = getActiveState()?.sensitivity ?? loadSupervisorConfig()?.sensitivity;
+        const saved = persistSupervisorConfig(ctx, provider, modelId, currentSensitivity);
         ctx.ui.notify(
           `Supervisor model set to ${provider}/${modelId}${state.isActive() ? "" : " (takes effect on next /supervise)"}` +
-            (saved ? " · saved to .pi/" : ""),
+            (saved ? " · saved to ~/.pi/agent/supervisor.json" : ""),
           "info"
         );
         return;
@@ -273,10 +285,10 @@ export default function (pi: ExtensionAPI) {
           updateUI(ctx, state.getState());
           ctx.ui.notify(`Supervisor sensitivity set to "${level}"`, "info");
         }
-        // Persist to workspace config regardless of active state
-        const cur = getActiveState() ?? loadWorkspaceConfig(ctx.cwd);
-        saveWorkspaceConfig(
-          ctx.cwd,
+        // Persist to global supervisor config regardless of active state
+        const cur = getActiveState() ?? loadSupervisorConfig();
+        persistSupervisorConfig(
+          ctx,
           cur?.provider ?? DEFAULT_PROVIDER,
           cur?.modelId  ?? DEFAULT_MODEL_ID,
           level,
@@ -288,13 +300,13 @@ export default function (pi: ExtensionAPI) {
 
       if (!trimmed || trimmed === "settings") {
         const s = getActiveState();
-        // Use workspace config as defaults so prior selections are shown when supervisor is inactive
-        const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+        // Use global config as defaults so prior selections are shown when supervisor is inactive
+        const supervisorConfig = loadSupervisorConfig();
         const result = await openSettings(
           ctx, s,
-          workspaceConfig?.provider ?? DEFAULT_PROVIDER,
-          workspaceConfig?.modelId  ?? DEFAULT_MODEL_ID,
-          workspaceConfig?.sensitivity ?? DEFAULT_SENSITIVITY,
+          supervisorConfig?.provider ?? DEFAULT_PROVIDER,
+          supervisorConfig?.modelId  ?? DEFAULT_MODEL_ID,
+          supervisorConfig?.sensitivity ?? DEFAULT_SENSITIVITY,
         );
         if (!result) return; // user cancelled with no changes
 
@@ -321,12 +333,12 @@ export default function (pi: ExtensionAPI) {
         // Persist model and/or sensitivity together
         if (result.model || result.sensitivity) {
           const cur = getActiveState();
-          const p = result.model?.provider ?? cur?.provider ?? workspaceConfig?.provider ?? DEFAULT_PROVIDER;
-          const m = result.model?.modelId  ?? cur?.modelId  ?? workspaceConfig?.modelId  ?? DEFAULT_MODEL_ID;
-          const sens = result.sensitivity  ?? cur?.sensitivity ?? workspaceConfig?.sensitivity;
-          const saved = saveWorkspaceConfig(ctx.cwd, p, m, sens);
+          const p = result.model?.provider ?? cur?.provider ?? supervisorConfig?.provider ?? DEFAULT_PROVIDER;
+          const m = result.model?.modelId  ?? cur?.modelId  ?? supervisorConfig?.modelId  ?? DEFAULT_MODEL_ID;
+          const sens = result.sensitivity  ?? cur?.sensitivity ?? supervisorConfig?.sensitivity;
+          const saved = persistSupervisorConfig(ctx, p, m, sens);
           if (saved && result.model) {
-            ctx.ui.notify(" · saved to .pi/", "info");
+            ctx.ui.notify(" · saved to ~/.pi/agent/supervisor.json", "info");
           }
         }
 
@@ -349,13 +361,13 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Resolve model settings: session state → workspace config → active session model → built-in defaults
+      // Resolve model settings: session state → global config → active session model → built-in defaults
       const existing = getActiveState();
-      const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+      const supervisorConfig = loadSupervisorConfig();
       const sessionModel = ctx.model;
-      let provider = existing?.provider ?? workspaceConfig?.provider ?? sessionModel?.provider ?? DEFAULT_PROVIDER;
-      let modelId  = existing?.modelId  ?? workspaceConfig?.modelId  ?? sessionModel?.id      ?? DEFAULT_MODEL_ID;
-      const sensitivity = existing?.sensitivity ?? workspaceConfig?.sensitivity ?? DEFAULT_SENSITIVITY;
+      let provider = existing?.provider ?? supervisorConfig?.provider ?? sessionModel?.provider ?? DEFAULT_PROVIDER;
+      let modelId  = existing?.modelId  ?? supervisorConfig?.modelId  ?? sessionModel?.id      ?? DEFAULT_MODEL_ID;
+      const sensitivity = existing?.sensitivity ?? supervisorConfig?.sensitivity ?? DEFAULT_SENSITIVITY;
 
       // Only prompt for a model if none has been configured yet
       if (!existing) {
@@ -409,7 +421,7 @@ export default function (pi: ExtensionAPI) {
       model: Type.Optional(Type.String({
         description:
           "Supervisor model as 'provider/modelId' (e.g. 'anthropic/claude-haiku-4-5-20251001'). " +
-          "Defaults to workspace config, then the active chat model.",
+          "Defaults to global supervisor config, then the active chat model.",
       })),
     }),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
@@ -425,10 +437,10 @@ export default function (pi: ExtensionAPI) {
         );
       }
 
-      // Resolve sensitivity: tool param → workspace config → built-in default
+      // Resolve sensitivity: tool param → global config → built-in default
       let sensitivity: Sensitivity = params.sensitivity ?? DEFAULT_SENSITIVITY;
 
-      // Resolve model: tool param → workspace config → active session model → built-in default
+      // Resolve model: tool param → global config → active session model → built-in default
       let provider: string;
       let modelId: string;
       if (params.model) {
@@ -436,12 +448,12 @@ export default function (pi: ExtensionAPI) {
         provider = slash === -1 ? DEFAULT_PROVIDER : params.model.slice(0, slash);
         modelId  = slash === -1 ? params.model     : params.model.slice(slash + 1);
       } else {
-        const workspaceConfig = loadWorkspaceConfig(ctx.cwd);
+        const supervisorConfig = loadSupervisorConfig();
         const sessionModel    = ctx.model;
-        provider = workspaceConfig?.provider ?? sessionModel?.provider ?? DEFAULT_PROVIDER;
-        modelId  = workspaceConfig?.modelId  ?? sessionModel?.id      ?? DEFAULT_MODEL_ID;
+        provider = supervisorConfig?.provider ?? sessionModel?.provider ?? DEFAULT_PROVIDER;
+        modelId  = supervisorConfig?.modelId  ?? sessionModel?.id      ?? DEFAULT_MODEL_ID;
         if (!params.sensitivity) {
-          sensitivity = workspaceConfig?.sensitivity ?? sensitivity;
+          sensitivity = supervisorConfig?.sensitivity ?? sensitivity;
         }
       }
 

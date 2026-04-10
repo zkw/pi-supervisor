@@ -114,11 +114,11 @@ The supervisor runs on a **separate model** — it can be a cheaper/faster model
 
 **Resolution order:**
 1. Previous session state (persists within a session)
-2. `.pi/supervisor-config.json` in the project root (saved by `/supervise model`)
+2. `~/.pi/agent/supervisor.json` (saved by `/supervise model`)
 3. Active chat model (`ctx.model`) — so it works out of the box with no configuration
 4. Built-in default: `anthropic/claude-haiku-4-5-20251001`
 
-Change at any time with `/supervise model` (interactive picker) or `/supervise model <provider/id>` (direct). The selection is saved to `.pi/supervisor-config.json` if the `.pi/` directory exists.
+Change at any time with `/supervise model` (interactive picker) or `/supervise model <provider/id>` (direct). The selection is saved to `~/.pi/agent/supervisor.json`.
 
 ## Focus and Goal Discipline
 
@@ -226,7 +226,7 @@ src/
   state.ts              # SupervisorStateManager — in-memory state + session persistence
   engine.ts             # Snapshot building, SUPERVISOR.md loading, prompt construction, analyze()
   model-client.ts       # One-shot supervisor LLM calls via pi's AgentSession API
-  workspace-config.ts   # .pi/supervisor-config.json read/write for model persistence
+  supervisor-config.ts  # ~/.pi/agent/supervisor.json read/write for model persistence
   ui/
     status-widget.ts    # 🎯 footer badge + one-line widget with live thinking stream
     model-picker.ts     # Interactive model picker using pi's ModelSelectorComponent

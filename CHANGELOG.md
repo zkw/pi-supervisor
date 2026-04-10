@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`start_supervision` tool** — the agent can initiate supervision itself; once active it is locked and only the user can change or stop it via `/supervise`
 - **`/supervise widget`** subcommand — toggle the status widget on/off
-- **Workspace model persistence** — supervisor model saved to `.pi/supervisor-config.json` when `.pi/` exists; loaded automatically on next session
+- **Global model persistence** — supervisor model saved to `~/.pi/agent/supervisor.json`; loaded automatically on next session
 - **Streaming thinking** — supervisor reasoning streams live as a second line in the widget while analyzing
 - **Stagnation detection** — after 5 consecutive steering messages with no `done`, switches to lenient evaluation (≥80% achieved → done) to avoid infinite loops
 - **Mid-run steering for `medium` sensitivity** — checks every 3rd tool cycle (turns 2, 5, 8, …), confidence ≥ 0.90
@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/supervise <outcome>` no longer auto-starts the agent** — supervision is set up first; the user starts the conversation separately, giving full control over the opening prompt
 - **Supervisor is now a pure outside observer** — removed system prompt injection (`before_agent_start`); the agent runs completely unmodified and the supervisor steers only through user messages
 - **Footer simplified** — `🎯` emoji replaces the `[SUPERVISING]` text label
-- **Model fallback chain** — session state → `.pi/supervisor-config.json` → active chat model → built-in default
+- **Model fallback chain** — session state → `~/.pi/agent/supervisor.json` → active chat model → built-in default
 - **Dead `ANALYSIS_INTERVAL` code removed** — `agent_end` always fires once per user prompt with the agent idle; the interval throttle was never reachable
 - Desired outcome repeated at the bottom of every supervisor analysis prompt to keep it prominent in long conversations
 
