@@ -46,6 +46,18 @@ export default function (pi: ExtensionAPI) {
   let currentCtx: ExtensionContext | undefined;
   let idleSteers = 0; // consecutive agent_end steers; reset on done/stop/new supervision
   const getActiveState = () => state.isActive() ? state.getState() : null;
+  const persistSupervisorConfig = (
+    ctx: ExtensionContext,
+    provider: string,
+    modelId: string,
+    sensitivity?: Sensitivity,
+  ): boolean => {
+    const saved = saveSupervisorConfig(provider, modelId, sensitivity);
+    if (!saved) {
+      ctx.ui.notify("Failed to save supervisor settings to ~/.pi/agent/supervisor.json.", "warning");
+    }
+    return saved;
+  };
 
   // ---- Session lifecycle: restore state ----
 
@@ -190,7 +202,8 @@ export default function (pi: ExtensionAPI) {
         if (result?.sensitivity && state.isActive()) state.setSensitivity(result.sensitivity);
         if (result?.model || result?.sensitivity) {
           const cur = getActiveState();
-          saveSupervisorConfig(
+          persistSupervisorConfig(
+            ctx,
             result.model?.provider ?? cur?.provider ?? DEFAULT_PROVIDER,
             result.model?.modelId  ?? cur?.modelId  ?? DEFAULT_MODEL_ID,
             result.sensitivity     ?? cur?.sensitivity,
@@ -224,7 +237,7 @@ export default function (pi: ExtensionAPI) {
             updateUI(ctx, state.getState());
           }
           const currentSensitivity = getActiveState()?.sensitivity ?? supervisorConfig?.sensitivity;
-          const saved = saveSupervisorConfig(provider, modelId, currentSensitivity);
+          const saved = persistSupervisorConfig(ctx, provider, modelId, currentSensitivity);
           ctx.ui.notify(
             `Supervisor model set to ${provider}/${modelId}${state.isActive() ? "" : " (takes effect on next /supervise)"}` +
               (saved ? " · saved to ~/.pi/agent/supervisor.json" : ""),
@@ -250,7 +263,7 @@ export default function (pi: ExtensionAPI) {
           updateUI(ctx, state.getState());
         }
         const currentSensitivity = getActiveState()?.sensitivity ?? loadSupervisorConfig()?.sensitivity;
-        const saved = saveSupervisorConfig(provider, modelId, currentSensitivity);
+        const saved = persistSupervisorConfig(ctx, provider, modelId, currentSensitivity);
         ctx.ui.notify(
           `Supervisor model set to ${provider}/${modelId}${state.isActive() ? "" : " (takes effect on next /supervise)"}` +
             (saved ? " · saved to ~/.pi/agent/supervisor.json" : ""),
@@ -274,7 +287,8 @@ export default function (pi: ExtensionAPI) {
         }
         // Persist to global supervisor config regardless of active state
         const cur = getActiveState() ?? loadSupervisorConfig();
-        saveSupervisorConfig(
+        persistSupervisorConfig(
+          ctx,
           cur?.provider ?? DEFAULT_PROVIDER,
           cur?.modelId  ?? DEFAULT_MODEL_ID,
           level,
@@ -322,7 +336,7 @@ export default function (pi: ExtensionAPI) {
           const p = result.model?.provider ?? cur?.provider ?? supervisorConfig?.provider ?? DEFAULT_PROVIDER;
           const m = result.model?.modelId  ?? cur?.modelId  ?? supervisorConfig?.modelId  ?? DEFAULT_MODEL_ID;
           const sens = result.sensitivity  ?? cur?.sensitivity ?? supervisorConfig?.sensitivity;
-          const saved = saveSupervisorConfig(p, m, sens);
+          const saved = persistSupervisorConfig(ctx, p, m, sens);
           if (saved && result.model) {
             ctx.ui.notify(" · saved to ~/.pi/agent/supervisor.json", "info");
           }
